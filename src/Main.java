@@ -1,87 +1,138 @@
-// Version 5.1
-// Use Case 5: Booking Request Queue (First-Come-First-Served)
+import java.util.*;
 
-import java.util.LinkedList;
-import java.util.Queue;
+// Class representing a booking request
+class BookingRequest {
 
-// Reservation class
-class Reservation {
+    String customerName;
+    String roomType;
 
-    private String guestName;
-    private String roomType;
-
-    public Reservation(String guestName, String roomType) {
-        this.guestName = guestName;
+    BookingRequest(String customerName, String roomType) {
+        this.customerName = customerName;
         this.roomType = roomType;
     }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-
-    public void displayReservation() {
-        System.out.println("Guest: " + guestName + " | Room Requested: " + roomType);
-    }
 }
 
-// Booking Request Queue
-class BookingRequestQueue {
+// Inventory Service
+class InventoryService {
 
-    private Queue<Reservation> requestQueue;
+    private Map<String, Integer> roomInventory = new HashMap<>();
 
-    public BookingRequestQueue() {
-        requestQueue = new LinkedList<>();
+    public InventoryService() {
+        roomInventory.put("Single", 3);
+        roomInventory.put("Double", 2);
+        roomInventory.put("Suite", 1);
     }
 
-    // Add request to queue
-    public void addRequest(Reservation reservation) {
-        requestQueue.add(reservation);
-        System.out.println("Booking request received from " + reservation.getGuestName());
+    public boolean checkAvailability(String roomType) {
+        return roomInventory.getOrDefault(roomType, 0) > 0;
     }
 
-    // Display queue
-    public void displayRequests() {
+    public void decrementRoom(String roomType) {
+        roomInventory.put(roomType, roomInventory.get(roomType) - 1);
+    }
 
-        System.out.println("\n===== Booking Request Queue =====");
-
-        if (requestQueue.isEmpty()) {
-            System.out.println("No requests in queue.");
-            return;
-        }
-
-        for (Reservation r : requestQueue) {
-            r.displayReservation();
+    public void displayInventory() {
+        System.out.println("\nCurrent Inventory:");
+        for (String type : roomInventory.keySet()) {
+            System.out.println(type + " Rooms Left: " + roomInventory.get(type));
         }
     }
 }
 
-// Main class
+// Booking Service
+class BookingService {
+
+    private Queue<BookingRequest> bookingQueue = new LinkedList<>();
+    private Map<String, Set<String>> allocatedRooms = new HashMap<>();
+    private Set<String> usedRoomIds = new HashSet<>();
+    private int roomCounter = 1;
+
+    private InventoryService inventory;
+
+    BookingService(InventoryService inventory) {
+        this.inventory = inventory;
+    }
+
+    // Add booking request
+    public void addBookingRequest(String customerName, String roomType) {
+        bookingQueue.add(new BookingRequest(customerName, roomType));
+        System.out.println("Booking request added for " + customerName + " (" + roomType + ")");
+    }
+
+    // Generate unique room ID
+    private String generateRoomId(String roomType) {
+        String roomId;
+
+        do {
+            roomId = roomType.substring(0, 1).toUpperCase() + roomCounter++;
+        } while (usedRoomIds.contains(roomId));
+
+        usedRoomIds.add(roomId);
+        return roomId;
+    }
+
+    // Process bookings
+    public void processBookings() {
+
+        while (!bookingQueue.isEmpty()) {
+
+            BookingRequest request = bookingQueue.poll();
+
+            System.out.println("\nProcessing request for " + request.customerName);
+
+            if (inventory.checkAvailability(request.roomType)) {
+
+                String roomId = generateRoomId(request.roomType);
+
+                allocatedRooms
+                        .computeIfAbsent(request.roomType, k -> new HashSet<>())
+                        .add(roomId);
+
+                inventory.decrementRoom(request.roomType);
+
+                System.out.println("Reservation Confirmed!");
+                System.out.println("Customer: " + request.customerName);
+                System.out.println("Room Type: " + request.roomType);
+                System.out.println("Allocated Room ID: " + roomId);
+
+            } else {
+                System.out.println("Sorry! No " + request.roomType + " rooms available.");
+            }
+        }
+    }
+
+    // Display allocated rooms
+    public void showAllocatedRooms() {
+
+        System.out.println("\nAllocated Rooms:");
+
+        for (String type : allocatedRooms.keySet()) {
+            System.out.println(type + " -> " + allocatedRooms.get(type));
+        }
+    }
+}
+
+// Main Class
 public class Main {
 
     public static void main(String[] args) {
 
-        System.out.println("===== Book My Stay – Booking Requests =====");
+        InventoryService inventory = new InventoryService();
+        BookingService bookingService = new BookingService(inventory);
 
-        // Initialize queue
-        BookingRequestQueue bookingQueue = new BookingRequestQueue();
+        // Add booking requests (FIFO Queue)
+        bookingService.addBookingRequest("Alice", "Single");
+        bookingService.addBookingRequest("Bob", "Double");
+        bookingService.addBookingRequest("Charlie", "Single");
+        bookingService.addBookingRequest("David", "Suite");
 
-        // Create reservations
-        Reservation r1 = new Reservation("Alice", "Single Room");
-        Reservation r2 = new Reservation("Bob", "Double Room");
-        Reservation r3 = new Reservation("Charlie", "Suite Room");
+        // Process bookings
+        bookingService.processBookings();
 
-        // Add requests (FIFO)
-        bookingQueue.addRequest(r1);
-        bookingQueue.addRequest(r2);
-        bookingQueue.addRequest(r3);
+        // Show allocated rooms
+        bookingService.showAllocatedRooms();
 
-        // Display queue
-        bookingQueue.displayRequests();
-
-        System.out.println("\nAll booking requests stored in FIFO order.");
+        // Show updated inventory
+        inventory.displayInventory();
     }
 }
